@@ -133,6 +133,7 @@ class RootNode extends WindowNode {
 	/**
 	 * Return whether the component for this RootNode is visible.
 	 */
+	@Override
 	boolean isVisible() {
 		return windowWrapper.isVisible();
 	}
@@ -450,9 +451,8 @@ class RootNode extends WindowNode {
 		invalid = true;
 		detachChild();
 		setLastFocusedProviderInWindow(null);   // clear out stale last focused provider
-		Iterator<DetachedWindowNode> it = detachedWindows.iterator();
-		while (it.hasNext()) {
-			DetachedWindowNode windowNode = it.next();
+		List<DetachedWindowNode> copy = new ArrayList<>(detachedWindows);
+		for (DetachedWindowNode windowNode : copy) {
 			notifyWindowRemoved(windowNode);
 			windowNode.dispose();
 		}
@@ -463,7 +463,9 @@ class RootNode extends WindowNode {
 		int width = Integer.parseInt(rootNodeElement.getAttributeValue("WIDTH"));
 		int height = Integer.parseInt(rootNodeElement.getAttributeValue("HEIGHT"));
 		JFrame frame = windowWrapper.getParentFrame();
-		frame.setBounds(x, y, width, height);
+		Rectangle bounds = new Rectangle(x, y, width, height);
+		WindowUtilities.ensureOnScreen(frame, bounds);
+		frame.setBounds(bounds);
 
 		List<ComponentPlaceholder> restoredPlaceholders = new ArrayList<>();
 		Iterator<?> elementIterator = rootNodeElement.getChildren().iterator();

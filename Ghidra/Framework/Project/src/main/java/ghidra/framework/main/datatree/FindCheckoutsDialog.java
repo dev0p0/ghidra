@@ -21,19 +21,15 @@ import java.awt.event.MouseEvent;
 import java.util.*;
 
 import javax.swing.BorderFactory;
-import javax.swing.JTable;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 
 import docking.ActionContext;
 import docking.DialogComponentProvider;
-import docking.widgets.table.GTableCellRenderer;
-import docking.widgets.table.GTableCellRenderingData;
+import docking.widgets.table.*;
 import docking.widgets.table.threaded.GThreadedTablePanel;
 import docking.widgets.table.threaded.ThreadedTableModelListener;
-import ghidra.framework.main.datatable.ProjectDataActionContext;
-import ghidra.framework.main.projectdata.actions.VersionControlCheckInAction;
-import ghidra.framework.main.projectdata.actions.VersionControlUndoCheckOutAction;
+import ghidra.framework.main.datatable.ProjectDataContext;
 import ghidra.framework.model.DomainFile;
 import ghidra.framework.model.DomainFolder;
 import ghidra.framework.plugintool.Plugin;
@@ -48,9 +44,7 @@ public class FindCheckoutsDialog extends DialogComponentProvider {
 	private FindCheckoutsTableModel model;
 	private Plugin plugin;
 	private DomainFolder folder;
-	private JTable table;
-	private VersionControlCheckInAction checkInAction;
-	private VersionControlUndoCheckOutAction undoCheckOutAction;
+	private GTable table;
 	private boolean showMessage = true;
 	private GThreadedTablePanel<CheckoutInfo> threadedTablePanel;
 
@@ -107,28 +101,12 @@ public class FindCheckoutsDialog extends DialogComponentProvider {
 				column.setPreferredWidth(180);
 			}
 		}
+
 		table.setPreferredScrollableViewportSize(
 			new Dimension(threadedTablePanel.getPreferredSize().width, 150));
-		table.getSelectionModel().addListSelectionListener(e -> setActionsEnabled());
+
 		addWorkPanel(threadedTablePanel);
 		addDismissButton();
-
-		createActions();
-	}
-
-	private void createActions() {
-		checkInAction = new VersionControlCheckInAction(plugin, table);
-		undoCheckOutAction = new VersionControlUndoCheckOutAction(plugin);
-
-		addAction(checkInAction);
-		addAction(undoCheckOutAction);
-		setActionsEnabled();
-	}
-
-	private void setActionsEnabled() {
-		boolean hasSelection = table.getSelectedRowCount() > 0;
-		checkInAction.setEnabled(hasSelection);
-		undoCheckOutAction.setEnabled(hasSelection);
 	}
 
 	private List<DomainFile> getFileList() {
@@ -143,12 +121,13 @@ public class FindCheckoutsDialog extends DialogComponentProvider {
 	@Override
 	public void close() {
 		super.close();
-		model.dispose();
+		threadedTablePanel.dispose();
 	}
 
 	@Override
 	public ActionContext getActionContext(MouseEvent event) {
-		return new ProjectDataActionContext(null, null, null, null, getFileList(), null, true);
+		return new ProjectDataContext(null, folder.getProjectData(), null, null,
+			getFileList(), null, true);
 	}
 
 	private class MyCellRenderer extends GTableCellRenderer {

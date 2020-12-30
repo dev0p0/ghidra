@@ -24,6 +24,7 @@ import java.awt.event.KeyListener;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
 
+import docking.action.MultipleKeyAction;
 import docking.actions.KeyBindingUtils;
 import ghidra.util.bean.GGlassPane;
 import ghidra.util.exception.AssertException;
@@ -33,7 +34,7 @@ import ghidra.util.exception.AssertException;
  * processing.  See {@link #dispatchKeyEvent(KeyEvent)} for a more detailed explanation of how
  * Ghidra processes key events.
  * <p>
- * {@link #install()} must be called in order to install this <tt>Singleton</tt> into Java's 
+ * {@link #install()} must be called in order to install this <code>Singleton</code> into Java's 
  * key event processing system.
  */
 public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher {
@@ -87,7 +88,7 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 	 *     <li><b>Reserved keybinding actions</b>
 	 *     <li>KeyListeners on the focused Component</li>
 	 *     <li>InputMap and ActionMap actions for the Component</li>
-	 *     <b><li>Ghidra tool-level actions</li></b>
+	 *     <li><b>Ghidra tool-level actions</b></li>
 	 *     <li>InputMap and ActionMap actions for the Component's parent, and so on up the
 	 *         Swing hierarchy</li>
 	 * </ol>
@@ -98,9 +99,9 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 	 * There are some exceptions to this processing chain:
 	 * <ol>
 	 *      <li>We don't do any processing when the focused component is an instance of 
-	 *          <tt>JTextComponent</tt>.</li>
+	 *          <code>JTextComponent</code>.</li>
 	 *      <li>We don't do any processing if the active window is an instance of 
-	 *          <tt>DockingDialog</tt>.</li>
+	 *          <code>DockingDialog</code>.</li>
 	 * </ol>
 	 * 
 	 * @see java.awt.KeyEventDispatcher#dispatchKeyEvent(java.awt.event.KeyEvent)
@@ -127,7 +128,8 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 		}
 
 		// some known special cases that we don't wish to process
-		if (!isValidContextForKeyStroke(KeyStroke.getKeyStrokeForEvent(event))) {
+		KeyStroke ks = KeyStroke.getKeyStrokeForEvent(event);
+		if (!isValidContextForKeyStroke(ks)) {
 			return false;
 		}
 
@@ -135,7 +137,7 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 			return false;
 		}
 
-		KeyBindingPrecedence keyBindingPrecedence = action.getKeyBindingPrecedence();
+		KeyBindingPrecedence keyBindingPrecedence = getValidKeyBindingPrecedence(action);
 		if (keyBindingPrecedence == null) {
 			// Odd Code: we use the precedence as a signal to say that, when it is null, there
 			//           are no valid bindings to be processed.  We used to have a isValidContext()
@@ -155,6 +157,15 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 			   processActionAtPrecedence(DefaultLevel, keyBindingPrecedence, action, event) ||
 			   throwAssertException();
 		// @formatter:on
+	}
+
+	private KeyBindingPrecedence getValidKeyBindingPrecedence(DockingKeyBindingAction action) {
+
+		if (action instanceof MultipleKeyAction) {
+			MultipleKeyAction multiAction = (MultipleKeyAction) action;
+			return multiAction.geValidKeyBindingPrecedence(focusProvider.getFocusOwner());
+		}
+		return action.getKeyBindingPrecedence();
 	}
 
 	/**
@@ -218,7 +229,13 @@ public class KeyBindingOverrideKeyEventDispatcher implements KeyEventDispatcher 
 	private boolean isValidContextForKeyStroke(KeyStroke keyStroke) {
 		Window activeWindow = focusProvider.getActiveWindow();
 		if (activeWindow instanceof DockingDialog) {
-			return false; // we don't want to process our key bindings when in DockingDialogs
+
+			// The choice to ignore modal dialogs was made long ago.  We cannot remember why the
+			// choice was made, but speculate that odd things can happen when keybindings are 
+			// processed with modal dialogs open.  For now, do not let key bindings get processed 
+			// for modal dialogs.  This can be changed in the future if needed.   
+			DockingDialog dialog = (DockingDialog) activeWindow;
+			return !dialog.isModal();
 		}
 		return true; // default case; allow it through
 	}
